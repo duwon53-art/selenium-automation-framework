@@ -1,0 +1,124 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
+import time
+#주소 변경하며 누룽지 상품 주문하기
+
+start_time = time.time()
+
+driver = webdriver.Chrome()
+wait = WebDriverWait(driver, 20)
+
+Url = 'https://w.com/member/login'
+Url210 = 'https://w.com/categories/page=1'
+Carturl = 'https://w.com/cart'
+
+driver.get(Url)
+
+from A_Mall_login_page import LoginPage
+login_page = LoginPage(driver)
+login_page.do_login("id", "pw")
+time.sleep(2)
+
+def login():
+    driver.get(Url)
+    login_page = LoginPage(driver)
+    login_page.do_login("id", "pw")
+
+
+def add_product():
+    driver.get(Url210)
+
+    wait.until(EC.element_to_be_clickable(
+        (By.XPATH, '//*[@id="container"]/div[2]/div[2]/div[2]/article[1]/a/div/button'))
+    ).click()
+
+    wait.until(EC.element_to_be_clickable(
+        (By.XPATH, "//button[contains(., '장바구니 담기')]"))
+    ).click()
+
+
+def change_address(i):
+    driver.get(Carturl)
+
+    # 주소 변경 버튼
+    wait.until(EC.element_to_be_clickable(
+        (By.XPATH, "//button[contains(., '변경')]"))
+    ).click()
+
+    main_window = driver.current_window_handle
+
+    # 새 창 전환
+    for handle in driver.window_handles:
+        if handle != main_window:
+            driver.switch_to.window(handle)
+            break
+
+    # 배송지 수정
+    driver.find_element(By.XPATH, "//button[contains(., '수정')]"    ).click()
+
+    address_box = driver.find_element(By.XPATH, '//*[@id="addressDetail"]')
+    address_box.send_keys(Keys.CONTROL + "a")
+    address_box.send_keys(Keys.DELETE)
+    address_box.send_keys(f"원어린이집 {i}")
+
+    driver.find_element(By.XPATH, "//button[contains(., '저장')]").click()
+
+    driver.switch_to.window(main_window)
+
+    # 팝업 닫기
+    wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., '확인')]"))).click()
+
+
+def place_order():
+    wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(., '원 주문하기')]"))).click()
+
+    target_button = wait.until(
+        EC.presence_of_element_located((By.XPATH, "//button[contains(., '모두사용')]"))
+    )
+
+    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target_button)
+    target_button.click()
+
+    wait.until(EC.element_to_be_clickable(
+        (By.XPATH, "//button[contains(., '결제하기')]"))
+    ).click()
+
+
+def verify_order(i):
+    try:
+        wait.until(EC.presence_of_element_located(
+            (By.XPATH, "//*[contains(text(),'주문을 완료했어요')]"))
+        )
+        print(f"{i} 주문 완료 ✅")
+        return True
+    except TimeoutException:
+        print(f"{i} 주문 실패 ❌")
+        return False
+
+
+# -------------------- 실행 로직 --------------------
+
+login()
+
+success = 0
+fail = 0
+
+for i in range(150):
+    add_product()
+    change_address(i)
+    place_order()
+
+    if verify_order(i):
+        success += 1
+    else:
+        fail += 1
+
+print(f"\n총 성공: {success}")
+print(f"총 실패: {fail}")
+print(f"총 실행 시간: {time.time() - start_time:.2f}초")
+
+driver.quit()
